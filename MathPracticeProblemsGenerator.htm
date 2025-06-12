@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Mr. Utomo's Math Practice Site</title>
+  <style>
+  body {
+    font-family: Arial, sans-serif;
+    text-align: center;
+    margin: 20px;
+  }
+
+  .grid-container {
+    display: grid;
+    grid-template-columns: repeat(4, 150px);
+    gap: 5px;
+    justify-content: center;
+    padding: 10px;
+  }
+
+  .problem {
+    font-size: 16px;
+    padding: 5px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    background-color: #f9f9f9;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 140px;
+    transition: background-color 0.3s;
+  }
+
+  .problem.correct {
+    background-color: #c6f6c6;
+  }
+
+  .problem.incorrect {
+    background-color: #f6c6c6;
+  }
+
+  .problem input {
+    width: 40px;
+    text-align: center;
+  }
+
+  /* Remove spinner arrows in number inputs (all browsers) */
+  .problem input::-webkit-outer-spin-button,
+  .problem input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  .problem input[type=number] {
+    -moz-appearance: textfield;
+  }
+
+  .result {
+    font-weight: bold;
+    margin-top: 20px;
+  }
+
+  .options {
+    margin-top: 20px;
+  }
+
+  .options label {
+    display: block;
+    margin: 4px 0;
+  }
+
+  @media print {
+    .grid-container {
+      grid-template-columns: repeat(4, 150px);
+    }
+
+    button,
+    .options {
+      display: none;
+    }
+  }
+</style>
+
+</head>
+<body>
+  <h1>Mr. Utomo's Math Practice Site</h1>
+  <div id="problems" class="grid-container"></div>
+
+  <button onclick="checkAnswers()">Submit Answers</button>
+  <button onclick="resetProblems()">New Problems</button>
+
+  <div class="options">
+    <label><input type="checkbox" id="checkAll" onchange="toggleAll()"> Check / Uncheck All</label>
+    <label><input type="checkbox" id="allowNegatives"> Include Negative Numbers</label>
+    <label><input type="checkbox" id="opAdd"> Addition (+)</label>
+    <label><input type="checkbox" id="opSub"> Subtraction (-)</label>
+    <label><input type="checkbox" id="opMul"> Multiplication (×)</label>
+    <label><input type="checkbox" id="opDiv"> Division (÷)</label>
+    <label>
+      Number of Problems:
+      <input type="number" id="problemCount" min="1" max="200" value="50" style="width: 60px; text-align: center;">
+    </label>
+  </div>
+
+  <div id="score" class="result"></div>
+
+  <script>
+    let problems = [];
+
+    function loadSettings() {
+      const settings = JSON.parse(localStorage.getItem("mathSettings")) || {};
+      document.getElementById("allowNegatives").checked = settings.allowNegatives ?? true;
+      document.getElementById("opAdd").checked = settings.opAdd ?? true;
+      document.getElementById("opSub").checked = settings.opSub ?? true;
+      document.getElementById("opMul").checked = settings.opMul ?? true;
+      document.getElementById("opDiv").checked = settings.opDiv ?? true;
+      document.getElementById("problemCount").value = settings.problemCount || 50;
+      updateCheckAllState();
+    }
+
+    function saveSettings() {
+      const settings = {
+        allowNegatives: document.getElementById("allowNegatives").checked,
+        opAdd: document.getElementById("opAdd").checked,
+        opSub: document.getElementById("opSub").checked,
+        opMul: document.getElementById("opMul").checked,
+        opDiv: document.getElementById("opDiv").checked,
+        problemCount: parseInt(document.getElementById("problemCount").value) || 50
+      };
+      localStorage.setItem("mathSettings", JSON.stringify(settings));
+    }
+
+    function toggleAll() {
+      const state = document.getElementById("checkAll").checked;
+      ["allowNegatives", "opAdd", "opSub", "opMul", "opDiv"].forEach(id => {
+        document.getElementById(id).checked = state;
+      });
+      saveSettings();
+    }
+
+    function updateCheckAllState() {
+      const allChecked = ["allowNegatives", "opAdd", "opSub", "opMul", "opDiv"]
+        .every(id => document.getElementById(id).checked);
+      document.getElementById("checkAll").checked = allChecked;
+    }
+
+    function attachCheckboxListeners() {
+      ["allowNegatives", "opAdd", "opSub", "opMul", "opDiv"].forEach(id => {
+        document.getElementById(id).addEventListener("change", () => {
+          updateCheckAllState();
+          saveSettings();
+        });
+      });
+      document.getElementById("problemCount").addEventListener("change", saveSettings);
+    }
+
+    function getSelectedOperators() {
+      const ops = [];
+      if (document.getElementById("opAdd").checked) ops.push('+');
+      if (document.getElementById("opSub").checked) ops.push('-');
+      if (document.getElementById("opMul").checked) ops.push('*');
+      if (document.getElementById("opDiv").checked) ops.push('/');
+      return ops;
+    }
+
+    function generateRandomNumber() {
+      const allowNegatives = document.getElementById("allowNegatives").checked;
+      return allowNegatives ? Math.floor(Math.random() * 25) - 12 : Math.floor(Math.random() * 13);
+    }
+
+    function generateProblem() {
+      const operators = getSelectedOperators();
+      if (operators.length === 0) {
+        alert("Please select at least one operator.");
+        return null;
+      }
+
+      const operator = operators[Math.floor(Math.random() * operators.length)];
+      let num1 = generateRandomNumber();
+      let num2 = generateRandomNumber();
+
+      if (operator === '/') {
+        if (num2 === 0) return generateProblem();
+        const result = generateRandomNumber();
+        num1 = result * num2;
+        return { num1, num2, operator, answer: result };
+      }
+
+      return { num1, num2, operator, answer: eval(`${num1} ${operator} ${num2}`) };
+    }
+
+    function createProblems() {
+      const problemsDiv = document.getElementById("problems");
+      problemsDiv.innerHTML = "";
+      problems = [];
+
+      const count = parseInt(document.getElementById("problemCount").value) || 50;
+
+      for (let i = 0; i < count; i++) {
+        const problem = generateProblem();
+        if (!problem) {
+          problemsDiv.innerHTML = "<p style='color:red;'>Error generating problems. Please check your settings.</p>";
+          return;
+        }
+        problems.push(problem);
+        const problemText = `${problem.num1} ${problem.operator} ${problem.num2} = `;
+        problemsDiv.innerHTML += `
+          <div class='problem' id='problemBox${i}'>
+            ${problemText}
+            <input type='number' id='answer${i}'>
+          </div>`;
+      }
+    }
+
+    function checkAnswers() {
+      let score = 0;
+      for (let i = 0; i < problems.length; i++) {
+        const correctAnswer = problems[i].answer;
+        const userAnswer = parseFloat(document.getElementById(`answer${i}`).value);
+        const box = document.getElementById(`problemBox${i}`);
+        box.classList.remove('correct', 'incorrect');
+
+        if (userAnswer === correctAnswer) {
+          score++;
+          box.classList.add('correct');
+        } else {
+          box.classList.add('incorrect');
+        }
+      }
+      document.getElementById("score").innerText = `You scored ${score}/${problems.length}!`;
+    }
+
+    function resetProblems() {
+      saveSettings();
+      createProblems();
+      document.getElementById("score").innerText = "";
+    }
+
+    loadSettings();
+    attachCheckboxListeners();
+    createProblems();
+  </script>
+</body>
+</html>
